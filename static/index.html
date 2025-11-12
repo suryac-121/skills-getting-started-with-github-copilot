@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Mergington High — Activities</title>
+  <style>
+    :root{
+      --bg:#f6f8fb;
+      --card:#ffffff;
+      --muted:#6b7280;
+      --accent:#2563eb;
+      --shadow: 0 6px 18px rgba(31,41,55,0.08);
+      --radius:12px;
+    }
+    html,body{height:100%;margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial;color:#0f172a;background:var(--bg);}
+    header{background:linear-gradient(90deg,#0ea5e922,#7c3aed22);padding:28px 20px;text-align:center}
+    header h1{margin:0;font-size:20px;letter-spacing:-0.2px}
+    header p{margin:6px 0 0;color:var(--muted);font-size:13px}
+    main{max-width:1100px;margin:28px auto;padding:0 20px}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px}
+    .card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;display:flex;flex-direction:column;gap:12px;transition:transform .15s ease,box-shadow .15s ease}
+    .card:hover{transform:translateY(-6px);box-shadow:0 12px 30px rgba(2,6,23,0.12)}
+    .title-row{display:flex;justify-content:space-between;align-items:center;gap:12px}
+    .title{font-weight:600;font-size:16px}
+    .meta{font-size:13px;color:var(--muted)}
+    .desc{font-size:14px;color:#0f172a;opacity:.9}
+    .pill{font-size:12px;padding:6px 8px;border-radius:999px;background:#eef2ff;color:#3730a3}
+    .participants-section{border-top:1px solid #eef2f6;padding-top:12px;margin-top:6px}
+    .participants-title{display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:600}
+  .participants-list{margin:8px 0 0;padding-left:0;color:#0f172a;list-style:none}
+  .participants-list li{margin:6px 0;font-size:13px;display:flex;align-items:center;gap:8px}
+  .participant-email{flex:1}
+  .delete-btn{background:transparent;border:0;color:#ef4444;cursor:pointer;padding:6px;border-radius:6px;font-size:14px}
+  .delete-btn:hover{background:rgba(239,68,68,0.08)}
+    .empty{font-style:italic;color:var(--muted);font-size:13px;margin-top:8px}
+    footer{max-width:1100px;margin:20px auto;padding:0 20px;color:var(--muted);font-size:13px}
+    @media (max-width:420px){header h1{font-size:18px}}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Mergington High — Extracurricular Activities</h1>
+    <p>View activities and who is already signed up. Sign up via the API.</p>
+  </header>
+
+  <main>
+    <div id="loading" class="meta">Loading activities…</div>
+    <div id="grid" class="grid" style="display:none"></div>
+  </main>
+
+  <footer>Tip: sign up by POSTing to <code>/activities/{activityName}/signup?email=you@example.com</code></footer>
+
+  <script>
+    async function loadActivities(){
+      try{
+        const res = await fetch('/activities');
+        if(!res.ok) throw new Error('Failed to load activities');
+        const data = await res.json();
+        renderActivities(data);
+      }catch(err){
+        document.getElementById('loading').textContent = 'Could not load activities.';
+        console.error(err);
+      }
+    }
+
+    function renderActivities(activities){
+      const loading = document.getElementById('loading');
+      const grid = document.getElementById('grid');
+      loading.style.display = 'none';
+      grid.style.display = 'grid';
+      grid.innerHTML = '';
+
+      Object.keys(activities).forEach(name => {
+        const a = activities[name];
+        const card = document.createElement('article');
+        card.className = 'card';
+
+        // header row
+        const titleRow = document.createElement('div');
+        titleRow.className = 'title-row';
+        const title = document.createElement('div');
+        title.className = 'title';
+        title.textContent = name;
+        const cap = document.createElement('div');
+        cap.className = 'pill';
+        cap.textContent = `${(a.participants||[]).length}/${a.max_participants}`;
+        titleRow.appendChild(title);
+        titleRow.appendChild(cap);
+
+        // description and schedule
+        const desc = document.createElement('div');
+        desc.className = 'desc';
+        desc.textContent = a.description || '';
+        const schedule = document.createElement('div');
+        schedule.className = 'meta';
+        schedule.textContent = a.schedule || '';
+
+        // participants section
+        const participantsSection = document.createElement('div');
+        participantsSection.className = 'participants-section';
+        const participantsTitle = document.createElement('div');
+        participantsTitle.className = 'participants-title';
+        participantsTitle.textContent = `Participants (${(a.participants||[]).length})`;
+        participantsSection.appendChild(participantsTitle);
+
+        if(a.participants && a.participants.length){
+          const ul = document.createElement('ul');
+          ul.className = 'participants-list';
+          // sort for consistent order
+          a.participants.slice().sort((x,y)=>x.localeCompare(y)).forEach(email=>{
+            const li = document.createElement('li');
+            const span = document.createElement('span');
+            span.className = 'participant-email';
+            span.textContent = email;
+
+            const btn = document.createElement('button');
+            btn.className = 'delete-btn';
+            btn.title = 'Unregister participant';
+            // use a simple × character as the delete icon
+            btn.innerHTML = '✕';
+            btn.addEventListener('click', async (e)=>{
+              e.preventDefault();
+              btn.disabled = true;
+              try{
+                const res = await fetch(`/activities/${encodeURIComponent(name)}/participants?email=${encodeURIComponent(email)}`, { method: 'DELETE' });
+                if(!res.ok){
+                  const body = await res.json().catch(()=>({detail:res.statusText}));
+                  alert('Could not remove participant: ' + (body.detail||res.statusText));
+                } else {
+                  // refresh activities list
+                  loadActivities();
+                }
+              }catch(err){
+                console.error(err);
+                alert('Network error while removing participant');
+              } finally {
+                btn.disabled = false;
+              }
+            });
+
+            li.appendChild(span);
+            li.appendChild(btn);
+            ul.appendChild(li);
+          });
+          participantsSection.appendChild(ul);
+        } else {
+          const empty = document.createElement('div');
+          empty.className = 'empty';
+          empty.textContent = 'No participants yet — be the first to sign up!';
+          participantsSection.appendChild(empty);
+        }
+
+        // assemble
+        card.appendChild(titleRow);
+        card.appendChild(desc);
+        card.appendChild(schedule);
+        card.appendChild(participantsSection);
+
+        grid.appendChild(card);
+      });
+    }
+
+    // initial load
+    loadActivities();
+
+    // Poll the server every 4 seconds to pick up signups/unregisters
+    // This keeps the UI in sync with API changes made elsewhere without a full page refresh.
+    setInterval(loadActivities, 4000);
+  </script>
+</body>
+</html>

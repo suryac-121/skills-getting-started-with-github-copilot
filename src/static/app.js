@@ -41,6 +41,46 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/[&<>"']/g, function(m) {
+      return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[m];
+    });
+  }
+
+  function renderActivities(activities) {
+    const container = document.getElementById('activities');
+    container.innerHTML = '';
+
+    activities.forEach(activity => {
+      const card = document.createElement('div');
+      card.className = 'activity-card';
+
+      const participantsHtml = (activity.participants && activity.participants.length)
+        ? `<ul class="participants-list">${activity.participants.map(p => `<li>${escapeHtml(p)}</li>`).join('')}</ul>`
+        : `<p class="participants-none">No participants yet</p>`;
+
+      card.innerHTML = `
+        <h3 class="activity-title">${escapeHtml(activity.name)}</h3>
+        <p class="activity-desc">${escapeHtml(activity.description || '')}</p>
+
+        <div class="participants">
+          <h4 class="participants-title">Participants</h4>
+          ${participantsHtml}
+        </div>
+
+        <form class="signup-form" data-activity="${escapeHtml(activity.name)}">
+          <input name="email" type="email" placeholder="you@example.com" required>
+          <button type="submit">Sign up</button>
+        </form>
+      `;
+
+      container.appendChild(card);
+    });
+
+    attachSignupHandlers();
+  }
+
   // Handle form submission
   signupForm.addEventListener("submit", async (event) => {
     event.preventDefault();
