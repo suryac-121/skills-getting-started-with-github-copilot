@@ -106,3 +106,23 @@ def signup_for_activity(activity_name: str, email: str):
         raise HTTPException(status_code=400, detail="Activity is full")
     activity["participants"].append(email)
     return {"message": f"Signed up {email} for {activity_name}"}
+
+
+@app.delete("/activities/{activity_name}/participants")
+def unregister_participant(activity_name: str, email: str):
+    """Unregister/remove a participant from an activity
+
+    Example: DELETE /activities/Chess%20Club/participants?email=you@example.com
+    """
+    # Validate activity exists
+    if activity_name not in activities:
+        raise HTTPException(status_code=404, detail="Activity not found")
+
+    activity = activities[activity_name]
+
+    # Validate participant is currently signed up
+    if email not in activity.get("participants", []):
+        raise HTTPException(status_code=400, detail="Participant not signed up for this activity")
+
+    activity["participants"].remove(email)
+    return {"message": f"Unregistered {email} from {activity_name}"}
